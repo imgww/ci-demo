@@ -1,0 +1,21 @@
+{
+  "name": "ci-demo",
+  "version": "1.0.0",
+  "description": "从零演示 CI 的最小 Node.js 工程：node:test + ESLint 9 + 零依赖构建",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "lint": "eslint src test build.js",
+    "test": "node --test",
+    "build": "node build.js",
+    "start": "node src/index.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0"
+  }
+}
