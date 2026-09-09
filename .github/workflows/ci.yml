@@ -106,4 +106,4 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd /var/www/ci-demo/app
-            pm2 startOrRestart server.js --name ci-demo
+            pm2 describe ci-demo >/dev/null 2>&1 && pm2 restart ci-demo || pm2 start server.js --name ci-demo
