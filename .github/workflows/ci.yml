@@ -75,8 +75,7 @@ jobs:
           retention-days: 7
 
   # ===== 阶段三：CD —— Docker 容器化部署 =====
-  # runner 构建镜像 → docker save 压缩 → scp 直传服务器 → docker load + 容器化运行
-  # （服务器无法稳定访问 ghcr.io/Docker Hub 拉取，镜像以传输方式交付，替代 scp + pm2）
+  # 服务器配国内镜像加速（海外 registry 不可达），部署 = 上传构建上下文 + 服务器 docker build + 容器化运行
   deploy:
     name: Deploy via Docker
     needs: build
@@ -88,41 +87,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          load: true
-          tags: ci-demo:latest
-
-      - name: Save & compress image
-        run: |
-          mkdir -p deploy-image
-          docker save ci-demo:latest | gzip -1 > deploy-image/ci-demo.tar.gz
-          du -h deploy-image/ci-demo.tar.gz
-
-      - name: Upload image to server
+      - name: Upload Docker build context to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "deploy-image/ci-demo.tar.gz"
-          target: "/tmp/ci-demo-deploy"
+          source: |
+            package.json
+            package-lock.json
+            index.html
+            build.js
+            server.mjs
+            Dockerfile
+            .dockerignore
+            src
+          target: "/var/www/ci-demo/docker"
 
-      - name: Deploy on server
+      - name: Build & run container on server
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            pm2 delete ci-demo >/dev/null 2>&1 || true
-            mkdir -p /tmp/ci-demo-deploy
-            docker load -i /tmp/ci-demo-deploy/ci-demo.tar.gz
+            cd /var/www/ci-demo/docker
+            docker build -t ci-demo:latest .
             docker rm -f ci-demo >/dev/null 2>&1 || true
+            pm2 delete ci-demo >/dev/null 2>&1 || true
             docker run -d --name ci-demo --restart unless-stopped -p 3000:3000 ci-demo:latest
