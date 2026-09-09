@@ -75,7 +75,8 @@ jobs:
           retention-days: 7
 
   # ===== 阶段三：CD —— Docker 容器化部署 =====
-  # 服务器配国内镜像加速（海外 registry 不可达），部署 = 上传构建上下文 + 服务器 docker build + 容器化运行
+  # 服务器海外数据面不可达（scp 大流量/海外 registry 数据流均被截断）→ 部署 = 服务器按 commit SHA
+  # 从 jsDelivr（国内 CDN，已验证数据流可达）拉取仓库源码 + 本机 docker build（基础镜像走国内加速器）+ 容器化运行
   deploy:
     name: Deploy via Docker
     needs: build
@@ -84,35 +85,29 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Upload Docker build context to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: |
-            package.json
-            package-lock.json
-            index.html
-            build.js
-            server.mjs
-            Dockerfile
-            .dockerignore
-            src
-          target: "/var/www/ci-demo/docker"
-
-      - name: Build & run container on server
+      - name: Deploy container on server (build from source via jsDelivr mirror)
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /var/www/ci-demo/docker
+            set -e
+            SHA=${{ github.sha }}
+            APP=/var/www/ci-demo/docker
+            rm -rf $APP/* 2>/dev/null || true
+            mkdir -p $APP/src
+            cd $APP
+            BASE="https://cdn.jsdelivr.net/gh/imgww/ci-demo@$SHA"
+            for f in Dockerfile server.mjs package.json package-lock.json index.html build.js; do
+              curl -fsSL --max-time 120 "$BASE/$f" -o "$f"
+            done
+            curl -fsSL --max-time 120 "$BASE/src/math.js" -o src/math.js
+            curl -fsSL --max-time 120 "$BASE/src/index.js" -o src/index.js
             docker build -t ci-demo:latest .
             docker rm -f ci-demo >/dev/null 2>&1 || true
             pm2 delete ci-demo >/dev/null 2>&1 || true
             docker run -d --name ci-demo --restart unless-stopped -p 3000:3000 ci-demo:latest
+            sleep 2
+            curl -s -o /dev/null -w "deploy http check: %{http_code}\n" --max-time 10 http://localhost:3000
+            docker ps --filter name=ci-demo --format "container: {{.Status}}"
