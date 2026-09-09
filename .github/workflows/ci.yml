@@ -101,9 +101,9 @@ jobs:
 
       - name: Save & compress image
         run: |
-          mkdir -p /tmp/deploy
-          docker save ci-demo:latest | gzip -1 > /tmp/deploy/ci-demo.tar.gz
-          du -h /tmp/deploy/ci-demo.tar.gz
+          mkdir -p deploy-image
+          docker save ci-demo:latest | gzip -1 > deploy-image/ci-demo.tar.gz
+          du -h deploy-image/ci-demo.tar.gz
 
       - name: Upload image to server
         uses: appleboy/scp-action@v0.1.7
@@ -111,7 +111,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "/tmp/deploy/ci-demo.tar.gz"
+          source: "deploy-image/ci-demo.tar.gz"
           target: "/tmp/ci-demo-deploy"
 
       - name: Deploy on server
