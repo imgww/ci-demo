@@ -91,6 +91,8 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          timeout: 60s
+          retry: 2
           script: |
             set -e
             SHA=${{ github.sha }}
@@ -100,10 +102,10 @@ jobs:
             cd $APP
             BASE="https://cdn.jsdelivr.net/gh/imgww/ci-demo@$SHA"
             for f in Dockerfile server.mjs package.json package-lock.json index.html build.js; do
-              curl -fsSL --max-time 120 "$BASE/$f" -o "$f"
+              curl --retry 5 --retry-delay 10 -fsSL --max-time 120 "$BASE/$f" -o "$f"
             done
-            curl -fsSL --max-time 120 "$BASE/src/math.js" -o src/math.js
-            curl -fsSL --max-time 120 "$BASE/src/index.js" -o src/index.js
+            curl --retry 5 --retry-delay 10 -fsSL --max-time 120 "$BASE/src/math.js" -o src/math.js
+            curl --retry 5 --retry-delay 10 -fsSL --max-time 120 "$BASE/src/index.js" -o src/index.js
             docker build -t ci-demo:latest .
             docker rm -f ci-demo >/dev/null 2>&1 || true
             pm2 delete ci-demo >/dev/null 2>&1 || true
