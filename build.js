@@ -1,5 +1,5 @@
-// 演示型零依赖构建：把 src/ 下的源码合并为一个单文件产物
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+// 演示型零依赖构建：把 src/ 下的源码合并为一个单文件产物，并复制页面
+import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +17,6 @@ for (const file of sources) {
 }
 
 await mkdir(join(root, 'dist'), { recursive: true });
-const out = join(root, 'dist', 'bundle.js');
-await writeFile(out, bundle, 'utf8');
-console.log(`build ok: dist/bundle.js (${Buffer.byteLength(bundle, 'utf8')} bytes)`);
+await writeFile(join(root, 'dist', 'bundle.js'), bundle, 'utf8');
+await copyFile(join(root, 'index.html'), join(root, 'dist', 'index.html'));
+console.log(`build ok: dist/bundle.js + dist/index.html (${Buffer.byteLength(bundle, 'utf8')} bytes)`);
