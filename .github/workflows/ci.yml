@@ -89,14 +89,21 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Deploy via SSH (示例)
-        # 使用前在仓库 Settings -> Secrets and variables -> Actions 配置：
-        #   SSH_HOST / SSH_USER / SSH_KEY
+      - name: Upload dist to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "dist/*"
+          target: "/var/www/ci-demo/app/dist"
+
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /var/www/ci-demo
-            pm2 restart ci-demo
+            cd /var/www/ci-demo/app
+            pm2 startOrRestart server.js --name ci-demo
